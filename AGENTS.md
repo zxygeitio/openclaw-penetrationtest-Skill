@@ -127,6 +127,16 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 
 这样能充分利用已有工具，避免重复造轮子。
 
+### 🧠 lessons_learned 错误学习系统
+
+**已手动加载，按以下规则执行：**
+
+1. **禁止词检查**：检测到删除/清空/格式化/rm -rf/发送邮件/发消息/提交代码/sudo/chmod 777 时 → 立即停止并确认
+2. **紧急停止**：检测到"停止/stop/取消/cancel/住手/hold on"时 → 立即停止所有操作
+3. **偏好记录**：用户说"我喜欢..."/"不要..."/"记住..."时 → 写入 memory/个人.md
+4. **错误记录**：操作失败时 → 写入 memory/lessons/MISTAKES.md
+5. **习惯记录**：用户习惯 → 写入 memory/lessons/HABITS.md
+
 **🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
 
 **📝 Platform Formatting:**
