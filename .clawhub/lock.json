@@ -4,6 +4,14 @@
     "skill-finder-cn": {
       "version": "1.0.0",
       "installedAt": 1772103003786
+    },
+    "multi-search-engine": {
+      "version": "2.0.1",
+      "installedAt": 1772214428027
+    },
+    "find-skills": {
+      "version": "0.1.0",
+      "installedAt": 1772225584031
     }
   }
 }
