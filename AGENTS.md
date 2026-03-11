@@ -230,3 +230,22 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
+
+---
+
+### 🔍 模棱两可处理规则
+**每一次指令模棱两可时：**
+1. 列出所有可能的解读方式
+2. 用 m 标注每个可能性
+3. 等待用户明确选择后再执行
+4. **禁止**凭猜测直接行动
+
+### 📝 复盘规则
+**每一次用户说"复盘"时：**
+1. 调用 self-improvement（自我提升）技能
+2. 调用 TAT 技能（如果有）
+3. 将 review 结果记录到对应记忆文档：
+   - `memory/lessons/MISTAKES.md` - 错误复盘
+   - `memory/lessons/HABITS.md` - 习惯优化
+   - `MEMORY.md` - 重要洞察
+4. 复盘完成后告知用户已记录
