@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      nodeName: k8s-worker01
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 11434
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+      volumes:
+      - name: ollama-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - port: 11434
+    targetPort: 11434
+    protocol: TCP
+    nodePort: 30034
+  selector:
+    app: ollama

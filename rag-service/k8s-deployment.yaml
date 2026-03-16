@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rag-data-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-service
+  template:
+    metadata:
+      labels:
+        app: rag-service
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+      - name: api
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          pip install --no-cache-dir fastapi uvicorn langchain langchain-community langchain-chroma pypdf python-multipart pydantic sentence-transformers > /dev/null 2>&1
+          sleep infinity
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: ollama-data
+        emptyDir: {}
+      - name: data
+        persistentVolumeClaim:
+          claimName: rag-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-service
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+    nodePort: 30080
+  - port: 11434
+    targetPort: 11434
+    protocol: TCP
+    name: ollama
+    nodePort: 30034
+  selector:
+    app: rag-service

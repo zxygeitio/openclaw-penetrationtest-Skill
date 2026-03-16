@@ -15,9 +15,10 @@ Things like:
 
 ### 网络代理
 
-- **问题**：网络连接问题时使用
-- **命令**：`proxy_on` 打开代理，`proxy_off` 关闭代理
-- **定时任务**：每天早上 8 点更新 GitHub 有趣项目（需要代理）打开
+- **proxy_on**: 打开代理 (~/.local/bin/proxy_on)
+- **proxy_off**: 关闭代理 (~/.local/bin/proxy_off)
+- **定时任务**: 每天早上 8 点更新 GitHub 有趣项目（需要代理）打开
+- **代理端口**: 7890 (HTTP/HTTPS)
 
 ```markdown
 ### Cameras
