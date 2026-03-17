@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-cluster-lb
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: rag-cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-cluster
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-cluster
+  template:
+    metadata:
+      labels:
+        app: rag-cluster
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - k8s-worker02
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: rag
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          pip install --no-cache-dir transformers torch sentence-transformers flask pypdf werkzeug > /dev/null 2>&1
+          cp -r /data/models /tmp/
+          cp -r /data/books /tmp/
+          cd /app
+          python3 -c "
+import os, uuid, threading
+from pathlib import Path
+from flask import Flask, request, jsonify
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL_PATH = '/tmp/models/qwen/Qwen2-0___5B'
+BOOKS_DIR = '/tmp/books'
+os.makedirs(BOOKS_DIR, exist_ok=True)
+
+print('Loading model...')
+tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True, device_map='auto')
+print('Model loaded!')
+
+app = Flask(__name__)
+tasks, documents = {}, []
+
+def load_documents():
+    global documents
+    documents = []
+    from pypdf import PdfReader
+    for file in Path(BOOKS_DIR).iterdir():
+        try:
+            if file.suffix.lower() == '.pdf':
+                reader = PdfReader(str(file))
+                text = chr(10).join([p.extract_text() for p in reader.pages])
+            elif file.suffix.lower() in ['.txt', '.md']:
+                text = file.read_text(encoding='utf-8')
+            else: continue
+            chunks = [text[i:i+1000] for i in range(0, len(text), 800)]
+            for i, chunk in enumerate(chunks):
+                if chunk.strip():
+                    documents.append({'id': f'{file.name}_{i}', 'source': file.name, 'text': chunk})
+        except: pass
+    print(f'Loaded {len(documents)} chunks')
+
+def generate_response(q, task_id):
+    try:
+        tasks[task_id]['status'] = 'processing'
+        keywords = q.lower().split()
+        relevant = [(sum(1 for kw in keywords if kw in doc['text'].lower()), doc) for doc in documents]
+        relevant.sort(reverse=True, key=lambda x: x[0])
+        context = chr(10)+chr(10).join([d[1]['text'] for _, d in relevant[:3]])
+        prompt = f'基于上下文回答。'+chr(10)+chr(10)+'上下文：'+context+chr(10)+chr(10)+'问题：'+q+chr(10)+chr(10)+'回答：' if context else q
+        inputs = tokenizer(prompt, return_tensors='pt').to(model.device)
+        outputs = model.generate(**inputs, max_new_tokens=1024)
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        if context: response = response[len(prompt):].strip()
+        tasks[task_id] = {'status': 'completed', 'result': response}
+    except Exception as e: tasks[task_id] = {'status': 'failed', 'error': str(e)}
+
+@app.route('/health')
+def health(): return jsonify({'status': 'ok', 'documents': len(documents)})
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    q = request.json.get('question', '')
+    keywords = q.lower().split()
+    relevant = [(sum(1 for kw in keywords if kw in doc['text'].lower()), doc) for doc in documents]
+    relevant.sort(reverse=True, key=lambda x: x[0])
+    context = chr(10)+chr(10).join([d[1]['text'] for _, d in relevant[:3]])
+    prompt = f'基于上下文回答。'+chr(10)+chr(10)+'上下文：'+context+chr(10)+chr(10)+'问题：'+q+chr(10)+chr(10)+'回答：' if context else q
+    inputs = tokenizer(prompt, return_tensors='pt').to(model.device)
+    outputs = model.generate(**inputs, max_new_tokens=512)
+    return jsonify({'answer': tokenizer.decode(outputs[0], skip_special_tokens=True)})
+
+@app.route('/chat/async', methods=['POST'])
+def chat_async():
+    q = request.json.get('question', '')
+    task_id = str(uuid.uuid4())
+    tasks[task_id] = {'status': 'pending', 'question': q}
+    threading.Thread(target=generate_response, args=(q, task_id), daemon=True).start()
+    return jsonify({'task_id': task_id, 'status': 'pending'})
+
+@app.route('/chat/task/<task_id>')
+def get_task(task_id): return jsonify(tasks.get(task_id, {'error': 'not found'}))
+
+if __name__ == '__main__':
+    load_documents()
+    app.run(host='0.0.0.0', port=8000)
+"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: nfs-data
+          mountPath: /data
+      volumes:
+      - name: nfs-data
+        persistentVolumeClaim:
+          claimName: rag-data-pvc
