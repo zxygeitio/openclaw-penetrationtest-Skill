@@ -14,3 +14,7 @@ _Learn about the person you're helping. Update this as you go._
 
 ---
 The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+## 部署偏好
+- 大型项目/Heavy workloads → **Worker 节点**
+- Master 节点只运行 K8s 系统组件
+- 避免在 master 上部署任何占用大量资源的应用
